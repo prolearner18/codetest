@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -12,34 +13,31 @@ namespace codetest
     [ApiController]
     public class WeatherController : ControllerBase
     {
-        string strWeather = "[{\"date\":\"2021-04-30T00:08:43.4486876+12:00\",\"temperatureC\":-3,\"temperatureF\":27,\"summary\":\"Scorching\"},{\"date\":\"2021-05-01T00:08:43.451029+12:00\",\"temperatureC\":48,\"temperatureF\":118,\"summary\":\"Balmy\"},{ \"date\":\"2021-05-02T00:08:43.4510322+12:00\",\"temperatureC\":4,\"temperatureF\":39,\"summary\":\"Mild\"},{ \"date\":\"2021-05-03T00:08:43.4510327+12:00\",\"temperatureC\":17,\"temperatureF\":62,\"summary\":\"Freezing\"},{ \"date\":\"2021-05-04T00:08:43.451033+12:00\",\"temperatureC\":22,\"temperatureF\":71,\"summary\":\"Scorching\"}]";
+        private IMemoryCache memoryCache;
+        private readonly string weatherForecastKey = "weatherForecastKey";
+        List<Weather> lsweather = null;
+        private int expiredDuration = 10;
+        public WeatherController(IMemoryCache memoryCache)
+        {
+            this.memoryCache = memoryCache;
+        }
 
         [HttpGet]
         [Route("GetWeatherForecast")]
         public string GetWeatherForecast()
-        {
-
-            string savedTime = string.Empty;
-            if (HttpContext.Session.GetString("Key") != null)
+        {   
+            string strWeatherForecast;
+            if (isDataExist())
             {
-                savedTime = HttpContext.Session.GetString("Key");
+                return JsonConvert.SerializeObject(lsweather);
             }
             else
             {
-                HttpContext.Session.SetString("Key", DateTime.Now.ToString());
-                savedTime = HttpContext.Session.GetString("Key");
+                strWeatherForecast = "[{\"date\":\"2021-04-30T00:08:43.4486876+12:00\",\"temperatureC\":-3,\"temperatureF\":27,\"summary\":\"Scorching\"},{\"date\":\"2021-05-01T00:08:43.451029+12:00\",\"temperatureC\":48,\"temperatureF\":118,\"summary\":\"Balmy\"},{ \"date\":\"2021-05-02T00:08:43.4510322+12:00\",\"temperatureC\":4,\"temperatureF\":39,\"summary\":\"Mild\"},{ \"date\":\"2021-05-03T00:08:43.4510327+12:00\",\"temperatureC\":17,\"temperatureF\":62,\"summary\":\"Freezing\"},{ \"date\":\"2021-05-04T00:08:43.451033+12:00\",\"temperatureC\":22,\"temperatureF\":71,\"summary\":\"Scorching\"}]";
+                lsweather = JsonConvert.DeserializeObject<List<Weather>>(strWeatherForecast);
+                SetToMemoryCache();
             }
-
-            var waitingTime = DateTime.Parse(savedTime);
-            waitingTime = waitingTime.AddMinutes(10);
-
-            if (DateTime.Now <= waitingTime)
-            {
-                return strWeather;
-            }
-            {
-                return "10mins plus, need to change value";
-            }
+            return strWeatherForecast;
         }
 
 
@@ -47,19 +45,35 @@ namespace codetest
         [Route("AddWeatherForecast")]
         public string AddWeatherForecast(string obj)
         {
-            var list = JsonConvert.DeserializeObject<List<Weather>>(obj);
-            Weather wth = new Weather
+            if (isDataExist())
             {
-                date = DateTime.Now.ToString(),
-                temperatureC = "4",
-                temperatureF = "6",
-                summary = "raining"
-            };
-            list.Add(wth);
-
-            var descListOb = list.OrderBy(x => x.date);
-            return JsonConvert.SerializeObject(descListOb);
+                return JsonConvert.SerializeObject(lsweather);
+            }
+            else
+            {
+                var rdn = new Random();
+                lsweather = JsonConvert.DeserializeObject<List<Weather>>(obj);
+                foreach (var data in lsweather)
+                {
+                    data.temperatureC = rdn.Next(-1, 30).ToString();
+                }
+                lsweather = lsweather.OrderBy(x => x.date).ToList();
+                SetToMemoryCache();
+                return JsonConvert.SerializeObject(lsweather);
+            }
         }
 
+        private bool isDataExist()
+        {
+            return memoryCache.TryGetValue(weatherForecastKey, out lsweather);
+        }
+
+        private void SetToMemoryCache()
+        {
+            var cacheOptions = new MemoryCacheEntryOptions()
+                .SetSlidingExpiration(TimeSpan.FromMinutes(expiredDuration))
+                .SetAbsoluteExpiration(TimeSpan.FromMinutes(expiredDuration));
+            memoryCache.Set(weatherForecastKey, lsweather, cacheOptions);
+        }
     }
 }

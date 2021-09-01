@@ -25,12 +25,16 @@ namespace codetest
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            
-
             services.AddMvc()
          .AddSessionStateTempDataProvider();
             services.AddSession();
             services.AddControllers();
+            services.AddMemoryCache();
+            //services.AddMemoryCache(options =>
+            //{
+            //    // Overall 1024 size (no unit)
+            //    options.SizeLimit = 1024;
+            //});
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
