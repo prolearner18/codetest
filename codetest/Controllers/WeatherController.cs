@@ -24,12 +24,12 @@ namespace codetest
 
         [HttpGet]
         [Route("GetWeatherForecast")]
-        public string GetWeatherForecast()
+        public IEnumerable<Weather> GetWeatherForecast()
         {   
             string strWeatherForecast;
             if (isDataExist())
             {
-                return JsonConvert.SerializeObject(lsweather);
+                return lsweather;
             }
             else
             {
@@ -37,29 +37,34 @@ namespace codetest
                 lsweather = JsonConvert.DeserializeObject<List<Weather>>(strWeatherForecast);
                 SetToMemoryCache();
             }
-            return strWeatherForecast;
+            return lsweather;
         }
 
 
         [HttpPost]
         [Route("AddWeatherForecast")]
-        public string AddWeatherForecast(string obj)
+        public IEnumerable<Weather> AddWeatherForecast([FromBody] Weather weather)
         {
             if (isDataExist())
             {
-                return JsonConvert.SerializeObject(lsweather);
+                return lsweather;
             }
             else
             {
                 var rdn = new Random();
-                lsweather = JsonConvert.DeserializeObject<List<Weather>>(obj);
-                foreach (var data in lsweather)
+                if (lsweather != null)
                 {
-                    data.temperatureC = rdn.Next(-1, 30).ToString();
+                    lsweather.Add(weather);
                 }
+                else
+                {
+                    lsweather = new List<Weather>();
+                    lsweather.Add(weather);
+                }
+
                 lsweather = lsweather.OrderBy(x => x.date).ToList();
                 SetToMemoryCache();
-                return JsonConvert.SerializeObject(lsweather);
+                return lsweather;
             }
         }
 
